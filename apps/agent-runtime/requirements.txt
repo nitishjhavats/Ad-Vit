@@ -19,4 +19,4 @@ imageio-ffmpeg==0.6.0
 # The orchestrator (app/orchestrator/graph.py) is a LangGraph state machine and
 # imports it when the graph is built. It was missing from this file, so an image
 # built only from requirements.txt could not run a chat turn.
-langgraph>=0.2,<2
+langgraph==1.2.12
