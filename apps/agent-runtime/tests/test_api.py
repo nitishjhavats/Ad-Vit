@@ -553,7 +553,12 @@ def test_a_provider_failure_degrades_rather_than_discarding_the_run(client, monk
     - all of which were produced deterministically before any model ran.
 
     Quality degrades, availability does not (PRD 14.6)."""
+    from app.config import get_settings
     from app.models.router import AllModelsFailed, ModelRouter
+
+    # The chat route only builds a model router when a key is configured; the
+    # key is never used, because the router's calls are replaced below.
+    monkeypatch.setattr(get_settings(), "openrouter_api_key", "sk-or-v1-test-not-a-real-key")
 
     def exploding(self, role, **kwargs):
         raise AllModelsFailed(role, [("stub", "HTTP 402: out of credits")])

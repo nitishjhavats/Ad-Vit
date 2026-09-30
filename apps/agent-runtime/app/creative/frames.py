@@ -231,7 +231,13 @@ def synthesize(path: Path, *, seconds: float = 6.0, width: int = 540, height: in
         cmd += ["-c:a", "aac", "-shortest"]
     cmd.append(str(path))
 
-    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    done = subprocess.run(cmd, capture_output=True, timeout=120)
+    if done.returncode != 0:
+        # ffmpeg's own message is the only useful part of this failure.
+        raise RuntimeError(
+            f"ffmpeg synthesize failed (exit {done.returncode}): "
+            + done.stderr.decode("utf-8", "replace")[-800:]
+        )
     return path
 
 
