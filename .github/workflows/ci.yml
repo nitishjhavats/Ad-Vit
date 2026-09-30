@@ -56,11 +56,12 @@ jobs:
         run: supabase db reset
 
       # The creative-studio tests talk to the local Storage API with the service
-      # role key, and draw a caption with ffmpeg, which needs a font on disk.
-      - name: Export local Supabase keys and install a font
+      # role key, and draw a caption with ffmpeg's drawtext filter, which the
+      # static imageio-ffmpeg build does not include: use the system ffmpeg.
+      - name: Export local Supabase keys, install ffmpeg and a font
         run: |
           supabase status -o env | sed -n 's/^SERVICE_ROLE_KEY=\(.*\)$/SUPABASE_SERVICE_ROLE_KEY=\1/p' | tr -d '"' >> "$GITHUB_ENV"
-          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
 
       # Three DSNs, and the split is the thing being tested as much as the
       # thing enabling the tests.
@@ -97,6 +98,8 @@ jobs:
           SUPABASE_URL: http://127.0.0.1:54321
           # Where an invitation link lands. No default in the app, on purpose.
           WEB_BASE_URL: http://localhost:3000
+          # System ffmpeg (with drawtext) for the creative-studio test videos.
+          IMAGEIO_FFMPEG_EXE: /usr/bin/ffmpeg
           # A throwaway AES-256 master key for core.org_secrets. The BYOK tests
           # override it per test anyway; this is here so anything that touches
           # the store outside those tests fails on a real error rather than on

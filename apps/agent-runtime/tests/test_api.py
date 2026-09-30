@@ -559,6 +559,10 @@ def test_a_provider_failure_degrades_rather_than_discarding_the_run(client, monk
     # The chat route only builds a model router when a key is configured; the
     # key is never used, because the router's calls are replaced below.
     monkeypatch.setattr(get_settings(), "openrouter_api_key", "sk-or-v1-test-not-a-real-key")
+    # The chat graph is built once and cached, so a key set now would be ignored
+    # by a graph an earlier test already built without one. Drop the cache for
+    # this test only; monkeypatch puts the earlier graph back afterwards.
+    monkeypatch.setattr("app.routes_chat._graph", None)
 
     def exploding(self, role, **kwargs):
         raise AllModelsFailed(role, [("stub", "HTTP 402: out of credits")])
