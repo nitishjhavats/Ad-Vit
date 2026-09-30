@@ -1,5 +1,7 @@
 # Ad-Vit : Agentic Meta ads AI OS
 
+[![CI](https://github.com/nitishjhavats/Ad-Vit/actions/workflows/ci.yml/badge.svg)](https://github.com/nitishjhavats/Ad-Vit/actions/workflows/ci.yml)
+
 <sub>by **[Broadmate Global](https://broadmate.org)** · hosted at [ad-vit.broadmate.org](https://ad-vit.broadmate.org) · licensed AGPL-3.0</sub>
 
 An open-source, multi-tenant **agentic Meta advertising OS**, built for Indian
@@ -25,9 +27,11 @@ for the control plane. Only Ad-Vit is built on the core today, but the core is
 kept product-agnostic so lifting it into a shared control plane is a move, not a
 rewrite.
 
-The suite covers the agent runtime, the database (RLS, entitlements, billing,
-audit) and a TypeScript compile-time test that a runtime call cannot take an
-unproved workspace id.
+**1,160 tests pass in CI** (`ubuntu-latest`, Python 3.13, Node 22): 321 against a
+real Postgres with Supabase's auth schema (RLS, entitlements, billing, audit, run
+from scratch migrations) and 839 in the agent runtime (2 skipped), plus a
+TypeScript compile-time test that a runtime call cannot take an unproved
+workspace id.
 
 ## Hosted vs self-hosted
 
