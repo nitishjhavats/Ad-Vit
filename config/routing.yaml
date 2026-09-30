@@ -1,0 +1,274 @@
+# =============================================================================
+# Model routing (PRD 17.7, founder decision D1)
+#
+# Route by TASK CLASS, never by naming one model in code. The frontier moves;
+# a config change plus an eval run should be enough to follow it, and no agent
+# should have to be edited.
+#
+# Prices below are what OpenRouter actually charges as of 2026-09-07, read from
+# its /models endpoint rather than assumed. One correction to the PRD: it
+# budgets the Bulk tier against Kimi K2.6 at ~$0.54/$2.28 per MTok, but K2.6
+# actually lists at $0.95/$4.00 - roughly double. K2.5 at $0.45/$2.25 is the
+# model that matches the PRD's stated economics, so it takes the Bulk slot and
+# K2.6 sits behind it as a capability fallback.
+#
+# Every role declares a fallback chain. A provider outage degrades quality,
+# never availability (PRD 14.6).
+# =============================================================================
+
+version: 1
+provider: openrouter
+base_url: https://openrouter.ai/api/v1
+
+# Sent by OpenRouter for attribution and rate-limit shaping.
+referer: https://broadmate.org
+title: ad-vit by Broadmate Global
+
+classes:
+
+  judgement:
+    description: >
+      Strategy, compliance adjudication, experiment design, creative analysis,
+      and the orchestrator turn the owner actually reads. Expensive per call,
+      low call volume - most runs never touch this tier.
+    primary: anthropic/claude-opus-5
+    fallbacks:
+      - anthropic/claude-opus-4.8
+      - anthropic/claude-sonnet-5
+    pricing_per_mtok: { in: 5.00, out: 25.00 }
+    context_window: 1000000
+    max_tokens: 8000
+    temperature: 0.2
+
+  working:
+    description: >
+      Routine agent steps, execution planning, report narration, structured
+      extraction. The volume workhorse.
+    primary: anthropic/claude-sonnet-5
+    fallbacks:
+      - anthropic/claude-sonnet-4.6
+      - anthropic/claude-haiku-4.5
+    pricing_per_mtok: { in: 2.00, out: 10.00 }
+    context_window: 1000000
+    max_tokens: 4000
+    temperature: 0.3
+
+  bulk:
+    description: >
+      Creative tagging at volume, log and feedback classification, compliance
+      screening passes, backfills. Roughly an order of magnitude cheaper than
+      judgement - this is where cost control actually happens.
+    primary: moonshotai/kimi-k2.5
+    fallbacks:
+      - anthropic/claude-haiku-4.5
+      - moonshotai/kimi-k2.6
+    pricing_per_mtok: { in: 0.45, out: 2.25 }
+    context_window: 262144
+    max_tokens: 2000
+    temperature: 0.1
+
+  embedding:
+    description: >
+      Memory retrieval and creative similarity. NOT served by OpenRouter's chat
+      completions API, so this class is declared but unresolved: calls to it
+      fail loudly rather than silently falling back to a chat model, which
+      would produce garbage similarity scores.
+    primary: null
+    fallbacks: []
+    unavailable_reason: >
+      OpenRouter does not expose an embeddings endpoint. Wire a dedicated
+      provider before enabling creative similarity or hybrid retrieval.
+
+# ---------------------------------------------------------------------------
+# Per-agent role assignment (PRD 7.3).
+#
+# Compliance deliberately screens cheaply and adjudicates expensively: most
+# checks never need a frontier model, and that split is the second-largest cost
+# lever after prompt caching (PRD 19.2).
+# ---------------------------------------------------------------------------
+roles:
+  orchestrator:      judgement
+  strategy:          judgement
+  compliance_judge:  judgement
+  compliance_screen: bulk
+  creative_analysis: judgement
+  creative_tagging:  bulk
+  analytics:         working
+  media_buying:      working
+  reporting:         working
+  learning:          judgement
+  research:          working
+  anomaly_explain:   bulk
+
+# ---------------------------------------------------------------------------
+# Per-function tiers: what an organisation actually chooses
+#
+# `roles` above is the DEFAULT routing, in the engineering vocabulary. This is
+# the same decision in the customer's vocabulary, and with a choice attached:
+# three options per function, one marked recommended, and the organisation picks
+# per function in its own settings (t_advit.model_preferences).
+#
+# Each option names a CLASS, not a model id. That is deliberate and it is the
+# only honest way to write this file:
+#
+#   * the classes above already carry models, fallback chains and prices read
+#     from OpenRouter's /models endpoint rather than assumed - the header of
+#     this file says so, and corrects the PRD on one of them;
+#   * a tier naming a raw model id would be a fourth place model names live,
+#     and the three that exist already have to be kept in step;
+#   * when a better model appears, correcting one class improves every function
+#     that routes to it, for every customer who has not overridden the tier.
+#
+# `cheap` resolves to the `bulk` class, whose primary is moonshotai/kimi-k2.5 -
+# an open-weight model, which is what makes that tier genuinely cheap rather
+# than merely a smaller frontier model.
+#
+# ABSENT from model_preferences means "use `recommended`". Not "use best" and
+# not "use cheap": an organisation that has never opened the settings page gets
+# the choice this file considers right, and improving that recommendation
+# reaches every such customer without touching a row.
+# ---------------------------------------------------------------------------
+tiers:
+
+  chat:
+    label: Chat with the media buyer
+    role: orchestrator
+    recommended: best
+    why_recommended: >
+      This is the turn the owner reads. It is also the turn that decides whether
+      a proposal is worth making, and a cheaper model here costs less per call
+      and more per mistake.
+    options:
+      best:  { class: judgement, note: "Frontier reasoning. The default." }
+      value: { class: working,   note: "Noticeably faster; weaker at weighing trade-offs." }
+      cheap: { class: bulk,      note: "Open-weight. Adequate for simple questions, not for decisions." }
+
+  strategy:
+    label: Strategy and brainstorming
+    role: strategy
+    recommended: best
+    why_recommended: >
+      A proposal that reaches the approval gate is a proposal somebody may
+      authorise. The cost of a bad option here is the spend it causes, which is
+      orders of magnitude above the cost of the call.
+    options:
+      best:  { class: judgement, note: "Best at trade-offs, and at saying what it does not know." }
+      value: { class: working,   note: "Fine for routine budget moves; thinner on novel situations." }
+      cheap: { class: bulk,      note: "Open-weight. Not recommended for anything that can spend money." }
+
+  creative_analysis:
+    label: Video and creative analysis
+    role: creative_analysis
+    recommended: best
+    why_recommended: >
+      Rating a video against what is currently performing in the ad library is
+      the judgement the customer is paying for. A cheap model produces a
+      confident score with nothing behind it.
+    options:
+      best:  { class: judgement, note: "Frontier multimodal judgement." }
+      value: { class: working,   note: "Solid on structure, weaker on why something works." }
+      cheap: { class: bulk,      note: "Open-weight. Tagging only; do not trust a rating from it." }
+
+  creative_tagging:
+    label: Creative tagging at volume
+    role: creative_tagging
+    recommended: cheap
+    why_recommended: >
+      Labelling hooks, formats and offers across a whole library is high volume
+      and low judgement. This is where cost control actually happens.
+    options:
+      best:  { class: judgement, note: "Wasteful here - the task does not need it." }
+      value: { class: working,   note: "If tagging accuracy is being complained about." }
+      cheap: { class: bulk,      note: "Open-weight. The right default." }
+
+  research:
+    label: Daily research on the net and on Meta
+    role: research
+    recommended: value
+    why_recommended: >
+      Reading and summarising sources is a working-tier task. What matters is
+      that the source is real and cited, which is a retrieval property rather
+      than a model one.
+    options:
+      best:  { class: judgement, note: "For interpreting a policy change, not for finding one." }
+      value: { class: working,   note: "The default." }
+      cheap: { class: bulk,      note: "Open-weight. Summarising only." }
+
+  learning:
+    label: Daily learning and improvement
+    role: learning
+    recommended: best
+    why_recommended: >
+      This is the agent that decides what the system believes about an account,
+      and promotes beliefs to the industry and global tiers. A wrong lesson
+      learned cheaply is then applied to every subsequent decision.
+    options:
+      best:  { class: judgement, note: "The default. A promoted belief is hard to unlearn." }
+      value: { class: working,   note: "Acceptable at account tier only." }
+      cheap: { class: bulk,      note: "Open-weight. Cheap wrong beliefs are expensive." }
+
+  media_buying:
+    label: Campaign and ad set creation
+    role: media_buying
+    recommended: value
+    why_recommended: >
+      Turning an approved proposal into typed tool calls is structured work, and
+      every one of those calls is then checked by parameter validation, the
+      guardrails and the approval gate. The model is not the last line here.
+    options:
+      best:  { class: judgement, note: "Rarely changes the outcome; the pipeline validates either way." }
+      value: { class: working,   note: "The default." }
+      cheap: { class: bulk,      note: "Open-weight. Expect more refusals from parameter validation." }
+
+  analytics:
+    label: Analytics and reporting
+    role: analytics
+    recommended: value
+    why_recommended: >
+      Every number in a report is computed in SQL before any model runs. What
+      the model does is narrate facts it is forbidden to alter, which is a
+      working-tier task by construction.
+    options:
+      best:  { class: judgement, note: "Better prose; identical numbers." }
+      value: { class: working,   note: "The default." }
+      cheap: { class: bulk,      note: "Open-weight. Blunter, and just as accurate." }
+
+  compliance_judge:
+    label: Compliance adjudication
+    role: compliance_judge
+    recommended: best
+    # No `options`, and that is the point.
+    #
+    # The compliance gate decides whether a creative may run under Indian
+    # statutory rules - DMR Act Schedule J, AYUSH licensing, RERA. Letting a
+    # customer pick a cheaper model for the check that keeps them legal is
+    # offering them a discount on their own compliance, and the first time it
+    # matters, "you selected the cheap tier" is not an answer this business can
+    # give. The screening pass stays cheap; the ADJUDICATION does not move.
+    fixed: true
+    why_recommended: >
+      Not a customer choice. A blocking legal verdict is adjudicated at the
+      frontier tier or not at all.
+
+# ---------------------------------------------------------------------------
+# Cost control
+# ---------------------------------------------------------------------------
+budgets:
+  # Hard per-run ceiling. A run that exceeds it degrades to a partial answer
+  # stating what was skipped - it never fails open (PRD 14.1).
+  max_tokens_per_run: 200000
+  # Warn the operator when a single run costs more than this.
+  warn_run_cost_inr: 50
+
+caching:
+  # The single largest cost lever in this architecture: the industry pack,
+  # policy rules and account digest are large and repeat on every call.
+  enabled: true
+  cache_stable_prefix: true
+
+# Batch variants cost half and are not latency-sensitive. Applies only to work
+# nobody is waiting on.
+batch_eligible_roles:
+  - creative_tagging
+  - compliance_screen
+  - anomaly_explain

@@ -1,0 +1,10 @@
+{
+  "name": "@advit/saas-core-db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Common SaaS Core database layer: schema, RLS policies, entitlement resolution, seed.",
+  "scripts": {
+    "test": "python -m pytest",
+    "test:setup": "python -m pip install -r requirements.txt"
+  }
+}

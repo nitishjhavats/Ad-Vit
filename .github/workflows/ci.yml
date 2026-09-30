@@ -1,0 +1,157 @@
+name: CI
+
+# There was no CI at all until now, which meant the standing guards in
+# packages/saas-core-db/tests ran only when somebody remembered to run them.
+# One of them exists precisely because a default is a trap:
+#
+#   * test_function_privileges - PostgreSQL grants EXECUTE on a new function to
+#     PUBLIC, so every migration silently widens access unless it revokes.
+#
+# A guard nobody runs is documentation.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests and standing guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            apps/agent-runtime/requirements.txt
+            apps/agent-runtime/requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/agent-runtime/requirements.txt
+          pip install -r apps/agent-runtime/requirements-dev.txt
+
+      # The suites are not unit tests over a mock. They exercise RLS policies,
+      # SECURITY DEFINER trust boundaries and CHECK constraints against a real
+      # Postgres with Supabase's auth schema and role set - which a bare
+      # postgres service container does not have.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Apply migrations and seeds from scratch
+        run: supabase db reset
+
+      # Three DSNs, and the split is the thing being tested as much as the
+      # thing enabling the tests.
+      #
+      #   DATABASE_URL  - superuser. Fixture setup only: disabling a trigger,
+      #                   inserting a row a tenant may not insert, reading
+      #                   pg_catalog. Read by no runtime code path, which
+      #                   test_service_connection_surface asserts.
+      #   TENANT_*      - advit_tenant, NOINHERIT, becomes `authenticated`.
+      #   SERVICE_*     - advit_service, INHERITs advit_backend.
+      #
+      # The two runtime credentials are created NOLOGIN by the migration and
+      # given these local passwords by supabase/seeds/05_runtime_roles_local.sql,
+      # so they exist only in a database `supabase db reset` just built.
+      - name: Database suite
+        working-directory: packages/saas-core-db
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          TENANT_DATABASE_URL: postgresql://advit_tenant:advit_tenant_local@127.0.0.1:54322/postgres
+          SERVICE_DATABASE_URL: postgresql://advit_service:advit_service_local@127.0.0.1:54322/postgres
+        run: python -m pytest -p no:warnings
+
+      - name: Agent runtime suite
+        working-directory: apps/agent-runtime
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          TENANT_DATABASE_URL: postgresql://advit_tenant:advit_tenant_local@127.0.0.1:54322/postgres
+          SERVICE_DATABASE_URL: postgresql://advit_service:advit_service_local@127.0.0.1:54322/postgres
+          # The local Supabase signing secret, printed by `supabase status`. The
+          # auth tests mint tokens that are deliberately wrong - expired, wrong
+          # audience, service-role, HS256-against-a-public-key - which an auth
+          # server will not issue, so the verifier's input has to be built here.
+          SUPABASE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+          SUPABASE_URL: http://127.0.0.1:54321
+          # A throwaway AES-256 master key for core.org_secrets. The BYOK tests
+          # override it per test anyway; this is here so anything that touches
+          # the store outside those tests fails on a real error rather than on
+          # "not configured".
+          ADVIT_SECRETS_MASTER_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+        run: python -m pytest -p no:warnings
+
+      # Cheap, and each one encodes a mistake already made once.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      # Not only a build check. apps/web/src/lib/__type_tests__ carries
+      # @ts-expect-error lines that FAIL when they stop erroring, so this step
+      # is what enforces that a runtime call cannot take an unproved workspace
+      # id - the TypeScript half of AuthorizedWorkspace, which unlike the Python
+      # half is compiler-enforced.
+      - name: Web typecheck (and the AuthorizedWorkspace brand)
+        run: npm run typecheck --workspaces --if-present
+
+      # The trap named in docs/auth-implementation-plan.md and deleted in the
+      # commit that added authentication: a shared bearer secret with no
+      # subject, no expiry, no audience, no per-actor revocation and no
+      # pg_stat_activity attribution. It had zero code references and existed
+      # only as a temptation; this stops it coming back.
+      - name: No shared-secret backdoor has been reintroduced
+        run: |
+          # Matches the variable in USE - an assignment, a lookup by name, a
+          # Settings field, the header - and not a prose mention of why it was
+          # removed. A guard that fired on its own explanation would be deleted
+          # within a week, which is the failure mode that matters here.
+          if grep -rnE "AGENT_RUNTIME_SECRET[[:space:]]*=|[\"']AGENT_RUNTIME_SECRET[\"']|agent_runtime_secret|X-Runtime-Secret" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.yml" --include="*.example" apps packages .env.example; then
+            echo "a shared runtime secret is back; see docs/auth-implementation-plan.md Step 8"
+            exit 1
+          fi
+          echo "no shared runtime secret"
+
+      - name: Brand lock-up has not drifted between the two surfaces
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+
+          # apps/web/src/lib/brand.ts and app/branding.py are the same lock-up
+          # rendered twice. assertBrandMatches() guards it at runtime; this
+          # catches it before anyone runs the app.
+          def value(path: str, pattern: str) -> str | None:
+              text = pathlib.Path(path).read_text(encoding="utf-8")
+              found = re.search(pattern, text)
+              return found.group(1) if found else None
+
+          ts = value("apps/web/src/lib/brand.ts", r'productName:\s*"([^"]+)"')
+          py = value("apps/agent-runtime/app/branding.py", r'product_name:\s*str\s*=\s*"([^"]+)"')
+
+          if ts is None or py is None:
+              sys.exit(f"could not read the product name from both surfaces: ts={ts!r} py={py!r}")
+          if ts != py:
+              sys.exit(f"brand drift: brand.ts says {ts!r}, branding.py says {py!r}")
+          print(f"brand lock-up agrees: {ts}")
+          PY
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup || true

@@ -1,0 +1,41 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+supabase/.branches/
+supabase/.temp/
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+coverage/
+.langfuse/
+
+# python venv
+.venv/
+
+# next.js
+.next/
+next-env.d.ts
+
+# Claude Code worktrees for parallel agents
+.claude/worktrees/

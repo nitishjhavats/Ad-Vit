@@ -1,0 +1,33 @@
+{
+  "name": "advit",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Meta Ad Manager AI OS — agentic Meta advertising OS on a reusable SaaS platform core",
+  "workspaces": [
+    "apps/web",
+    "apps/superadmin",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "langfuse:up": "docker compose -f infra/docker-compose.langfuse.yml up -d",
+    "langfuse:down": "docker compose -f infra/docker-compose.langfuse.yml down",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:superadmin": "npm run dev -w apps/superadmin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "supabase": "^2.22.6",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "advit": "file:"
+  }
+}

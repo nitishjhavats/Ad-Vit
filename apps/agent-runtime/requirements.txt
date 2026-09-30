@@ -1,0 +1,18 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+psycopg[binary,pool]==3.2.3
+httpx==0.28.1
+# Not python-jose (unmaintained; CVE-2024-33663 algorithm confusion) and not
+# Authlib (a much larger surface for one function). PyJWT ships PyJWKClient
+# with keyed caching and FORCES an explicit algorithms=[...] list, which is
+# the mitigation for the classic algorithm-confusion forgery.
+pyjwt[crypto]==2.10.1
+pyyaml==6.0.2
+python-dotenv==1.0.1
+# A static ffmpeg binary for the platform pip runs on - the same package on
+# the developer's Windows machine and in the Linux image, and no apt line in
+# the Dockerfile. The creative studio uses it to probe a video and pull the
+# frames a vision model is shown.
+imageio-ffmpeg==0.6.0

@@ -1,0 +1,90 @@
+{
+  "_meta": {
+    "captured_at": "2026-09-03",
+    "source": "Meta Ads MCP, read-only",
+    "note": "Real structure from the connected accounts. Used by FixtureDriver so the spine is exercised against true data shapes without touching the network. Metrics are NOT captured here - only structure and health - because metric fixtures go stale silently and invite false confidence.",
+    "observed_findings": [
+      "Neither funded account has any dataset (pixel). Offline conversion upload and CAPI deduplication - the closed loop this product is built on - cannot run until one exists.",
+      "Ad sets carry Meta's auto-generated default names, three of them identical ('New Leads Ad Set'). Nothing downstream can tell them apart in a report.",
+      "Four campaigns on one account and two on the other, each with a single ad set. This is the fragmentation pattern PRD 15.1 names as the most common cause of permanent learning-limited status in small accounts.",
+      "'Piles 2' and 'Piles2' are near-duplicate campaign names on the same account."
+    ]
+  },
+
+  "ad_accounts": [
+    {
+      "ad_account_id": "1000000000000001",
+      "ad_account_name": "Demo Brand call ads",
+      "business_id": "2000000000000001",
+      "business_name": "Demo Brand",
+      "account_status": "ACTIVE",
+      "currency": "INR",
+      "has_payment_method": true,
+      "min_daily_budget_cents": 9615,
+      "is_ads_mcp_enabled": true,
+      "write_enabled": false
+    },
+    {
+      "ad_account_id": "1000000000000002",
+      "ad_account_name": "PILES CARE 2",
+      "business_id": "2000000000000001",
+      "business_name": "Demo Brand",
+      "account_status": "ACTIVE",
+      "currency": "INR",
+      "has_payment_method": true,
+      "min_daily_budget_cents": 9615,
+      "is_ads_mcp_enabled": true,
+      "write_enabled": false
+    },
+    {
+      "ad_account_id": "1000000000000003",
+      "ad_account_name": "Aman Jha",
+      "business_id": "",
+      "business_name": "",
+      "account_status": "ACTIVE",
+      "currency": "INR",
+      "has_payment_method": false,
+      "min_daily_budget_cents": 9615,
+      "is_ads_mcp_enabled": true,
+      "write_enabled": true,
+      "note": "Designated write target. No payment method attached, so even an accidental activation cannot spend."
+    }
+  ],
+
+  "campaigns": {
+    "1000000000000001": [
+      { "id": "120000000000000001", "name": "PT calls" },
+      { "id": "120000000000000002", "name": "Piles care Aw" },
+      { "id": "120000000000000003", "name": "Piles care L" },
+      { "id": "120000000000000004", "name": "Piles care" }
+    ],
+    "1000000000000002": [
+      { "id": "120000000000000005", "name": "Piles 2" },
+      { "id": "120000000000000006", "name": "Piles2" }
+    ],
+    "1000000000000003": []
+  },
+
+  "adsets": {
+    "1000000000000001": [
+      { "id": "120000000000000007", "name": "New Leads Ad Set" },
+      { "id": "120000000000000008", "name": "New Awareness Ad Set" },
+      { "id": "120000000000000009", "name": "New Leads Ad Set" },
+      { "id": "120000000000000010", "name": "New Leads Ad Set" }
+    ],
+    "1000000000000002": [],
+    "1000000000000003": []
+  },
+
+  "ads": {
+    "1000000000000001": [],
+    "1000000000000002": [],
+    "1000000000000003": []
+  },
+
+  "datasets": {
+    "1000000000000001": [],
+    "1000000000000002": [],
+    "1000000000000003": []
+  }
+}

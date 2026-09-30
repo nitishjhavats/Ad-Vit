@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/tsconfig.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+docs
+supabase/.branches
+supabase/.temp
