@@ -1,6 +1,6 @@
 # Ad-Vit : Agentic Meta ads AI OS
 
-[![CI](https://github.com/nitishjhavats/Ad-Vit/actions/workflows/ci.yml/badge.svg)](https://github.com/nitishjhavats/Ad-Vit/actions/workflows/ci.yml)
+[![CI](https://github.com/nitishjhavats/Ad-Vit-Agentic-Meta-Ads-AI-OS/actions/workflows/ci.yml/badge.svg)](https://github.com/nitishjhavats/Ad-Vit-Agentic-Meta-Ads-AI-OS/actions/workflows/ci.yml)
 
 <sub>by **[Broadmate Global](https://broadmate.org)** · hosted at [ad-vit.broadmate.org](https://ad-vit.broadmate.org) · licensed AGPL-3.0</sub>
 
