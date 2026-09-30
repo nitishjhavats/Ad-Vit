@@ -19,6 +19,7 @@ limitation, and Platform Watch's job is not to hide limitations.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -176,6 +177,27 @@ def extract(path: Path) -> Extracted:
 # ---------------------------------------------------------------------------
 
 
+def _font_file() -> str | None:
+    """A TrueType font for drawtext, or None.
+
+    imageio-ffmpeg's static build has no fontconfig fallback, so `drawtext`
+    without an explicit fontfile exits non-zero on a machine that has no
+    default font wired up (a stock CI runner). Set ADVIT_FONT_FILE to override.
+    """
+    candidates = [
+        os.environ.get("ADVIT_FONT_FILE", ""),
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+    ]
+    for c in candidates:
+        if c and Path(c).is_file():
+            return c
+    return None
+
+
 def synthesize(path: Path, *, seconds: float = 6.0, width: int = 540, height: int = 960,
                with_audio: bool = False, text: str | None = None) -> Path:
     """Render a test-pattern video with ffmpeg's own generators.
@@ -192,8 +214,12 @@ def synthesize(path: Path, *, seconds: float = 6.0, width: int = 540, height: in
     filters = []
     if text:
         safe = text.replace("'", r"\'").replace(":", r"\:")
+        font = _font_file()
+        fontopt = ""
+        if font:
+            fontopt = "fontfile='" + font.replace("\\", "/").replace(":", r"\:") + "':"
         filters.append(
-            f"drawtext=text='{safe}':x=(w-text_w)/2:y=h-120:fontsize=40:"
+            f"drawtext={fontopt}text='{safe}':x=(w-text_w)/2:y=h-120:fontsize=40:"
             "fontcolor=white:box=1:boxcolor=black@0.6"
         )
 
